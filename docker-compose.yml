@@ -1,0 +1,39 @@
+version: '3.8'
+
+services:
+  api:
+    build:
+      context: .
+      target: 'development'
+    container_name: 'api'
+    depends_on:
+     - 'mongodb'
+    hostname: 'api'
+    networks:
+      - 'development_network'
+    ports:
+      - '3000:3000'
+    restart: 'unless-stopped'
+    volumes:
+      - './src:/app/src'
+      - '/app/node_modules'
+
+  mongodb:
+    image: 'mongo:6.0.14'
+    container_name: 'mongodb'
+    expose:
+      - '27017'
+    hostname: 'mongodb'
+    networks:
+      - 'development_network'
+    restart: 'unless-stopped'
+    volumes:
+      - 'mongodb_data:/data/db'
+
+volumes:
+
+  mongodb_data:
+
+networks:
+  development_network:
+    name: 'development_network'

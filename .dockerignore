@@ -1,0 +1,8 @@
+.docker
+.git
+.github
+node_modules
+.env
+docker-compose.yml
+Dockerfile
+mongodb-binaries
