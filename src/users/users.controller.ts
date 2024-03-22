@@ -54,11 +54,9 @@ export class UsersController {
 
   @Post()
   async postUser(@Body() createUserDto: CreateUserDto) {
+    const { username, password } = createUserDto;
     try {
-      return await this.usersService.createUser(
-        createUserDto.username,
-        createUserDto.password,
-      );
+      return await this.usersService.createUser(username, password);
     } catch (e) {
       throw new BadRequestException();
     }

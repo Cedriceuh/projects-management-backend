@@ -5,6 +5,7 @@ import { User } from './schemas/user.schema';
 import { UserDto } from './dtos/user.dto';
 import { toUserDto } from './users.mapper';
 import { Role } from './enums/role.enum';
+import { UpdateUserDto } from './dtos/update-user.dto';
 
 @Injectable()
 export class UsersService {
@@ -61,7 +62,7 @@ export class UsersService {
     return toUserDto(userDocument);
   }
 
-  async updateById(id: string, updateBody: Partial<UserDto>): Promise<boolean> {
+  async updateById(id: string, updateBody: UpdateUserDto): Promise<boolean> {
     const userDocument = await this.userModel.findById(id);
     if (!userDocument) {
       return false;
@@ -76,8 +77,8 @@ export class UsersService {
   }
 
   async deleteById(id: string): Promise<boolean> {
-    const deletedUserDocument = await this.userModel.findByIdAndDelete(id);
-    if (!deletedUserDocument) {
+    const userDocument = await this.userModel.findByIdAndDelete(id);
+    if (!userDocument) {
       return false;
     }
 

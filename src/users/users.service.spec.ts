@@ -90,7 +90,7 @@ describe('UsersService', () => {
   });
 
   describe('getByUsername', () => {
-    it('should find a user by username', async () => {
+    it('should return a user DTO by username', async () => {
       jest.spyOn(userModel, 'findOne').mockResolvedValue(userDocument);
 
       const result = await service.getByUsername(username);
@@ -100,10 +100,18 @@ describe('UsersService', () => {
         password: hashedPassword,
       });
     });
+
+    it('should return null when user is not found', async () => {
+      jest.spyOn(userModel, 'findOne').mockResolvedValue(null);
+
+      const result = await service.getByUsername(username);
+
+      expect(result).toBeNull();
+    });
   });
 
   describe('getById', () => {
-    it('should find a user by id', async () => {
+    it('should return a user DTO by id', async () => {
       jest.spyOn(userModel, 'findById').mockResolvedValue(userDocument);
 
       const result = await service.getById(userObjectId.toString());
@@ -112,6 +120,14 @@ describe('UsersService', () => {
         ...userDto,
         password: hashedPassword,
       });
+    });
+
+    it('should return null when user is not found', async () => {
+      jest.spyOn(userModel, 'findById').mockResolvedValue(null);
+
+      const result = await service.getById(userObjectId.toString());
+
+      expect(result).toBeNull();
     });
   });
 
@@ -185,7 +201,7 @@ describe('UsersService', () => {
     const updatedUsername = 'testuser2';
     const updatedPassword = 'testpassword2';
 
-    it('should update username and/or password of a user by id', async () => {
+    it('should return true when user is updated', async () => {
       jest.spyOn(userModel, 'findById').mockResolvedValue(userDocument);
 
       const result = await service.updateById(userObjectId.toString(), {
@@ -196,7 +212,7 @@ describe('UsersService', () => {
       expect(result).toBe(true);
     });
 
-    it('should not delete any user when provided id is not found', async () => {
+    it('should return false when user is not found', async () => {
       jest.spyOn(userModel, 'findById').mockResolvedValue(null);
 
       const result = await service.updateById('', {});
