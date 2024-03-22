@@ -1,15 +1,16 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { INestApplication, ValidationPipe } from '@nestjs/common';
-import { getConnectionToken } from '@nestjs/mongoose';
+import { getModelToken } from '@nestjs/mongoose';
 import * as request from 'supertest';
-import { Connection, Types } from 'mongoose';
+import { Model, Types } from 'mongoose';
 import { TestSetupModule } from './test-setup.module';
 import { UsersService } from '../src/users/users.service';
 import * as process from 'process';
+import { User } from '../src/users/schemas/user.schema';
 
 describe('UsersController (e2e)', () => {
   let app: INestApplication;
-  let mongoConnection: Connection;
+  let userModel: Model<User>;
   let usersService: UsersService;
   let adminToken: string;
 
@@ -41,11 +42,11 @@ describe('UsersController (e2e)', () => {
 
     adminToken = response.body.access_token;
     usersService = app.get<UsersService>(UsersService);
-    mongoConnection = app.get(getConnectionToken());
+    userModel = app.get(getModelToken(User.name));
   });
 
   afterEach(async () => {
-    await mongoConnection.model('User').deleteMany({});
+    await userModel.deleteMany({});
   });
 
   afterAll(async () => {
@@ -67,7 +68,7 @@ describe('UsersController (e2e)', () => {
       userToken = response.body.access_token;
     });
 
-    it('/users (POST)', async () => {
+    it('POST /users', async () => {
       await request(app.getHttpServer())
         .post('/users')
         .send({ username: 'username', password: 'password' })
@@ -86,7 +87,7 @@ describe('UsersController (e2e)', () => {
         .expect(201);
     });
 
-    it('/users (GET)', async () => {
+    it('GET /users', async () => {
       await request(app.getHttpServer()).get('/users').expect(401);
 
       await request(app.getHttpServer())
@@ -100,7 +101,7 @@ describe('UsersController (e2e)', () => {
         .expect(200);
     });
 
-    it('/users/:id (GET)', async () => {
+    it('GET /users/:id', async () => {
       await request(app.getHttpServer())
         .get(`/users/${userId}`)
         .send({ id: userId })
@@ -119,7 +120,7 @@ describe('UsersController (e2e)', () => {
         .expect(200);
     });
 
-    it('/users/:id (PATCH)', async () => {
+    it('PATCH /users/:id', async () => {
       await request(app.getHttpServer()).patch(`/users/${userId}`).expect(401);
 
       await request(app.getHttpServer())
@@ -133,7 +134,7 @@ describe('UsersController (e2e)', () => {
         .expect(204);
     });
 
-    it('/users/:id (DELETE)', async () => {
+    it('DELETE /users/:id', async () => {
       await request(app.getHttpServer()).delete(`/users/${userId}`).expect(401);
 
       await request(app.getHttpServer())
@@ -209,7 +210,7 @@ describe('UsersController (e2e)', () => {
     });
   });
 
-  describe('returns user data', () => {
+  describe('returns a user data', () => {
     it('successfully', async () => {
       const createUserResponse = await request(app.getHttpServer())
         .post('/users')
@@ -226,12 +227,12 @@ describe('UsersController (e2e)', () => {
       expect(response.body).toEqual(await usersService.getById(createdUser.id));
     });
 
-    it('throws an error when requesting user data for an invalid userId', async () => {
-      const invalidUserId = 'someWrongId';
+    it('throws an error when user is not found', async () => {
+      const id = new Types.ObjectId().toString();
       await request(app.getHttpServer())
-        .get(`/users/${invalidUserId}`)
+        .get(`/users/${id}`)
         .set('Authorization', `Bearer ${adminToken}`)
-        .expect(400);
+        .expect(404);
     });
   });
 
@@ -322,46 +323,55 @@ describe('UsersController (e2e)', () => {
         .expect(400);
     });
 
-    it('throws an error when updating a user with invalid parameters', async () => {
-      const createUserResponse = await request(app.getHttpServer())
-        .post('/users')
-        .set('Authorization', `Bearer ${adminToken}`)
-        .send({ username, password });
-      const createdUser = createUserResponse.body;
+    describe('throws an error when parameters are invalid', () => {
+      it('when username is too short', async () => {
+        const createUserResponse = await request(app.getHttpServer())
+          .post('/users')
+          .set('Authorization', `Bearer ${adminToken}`)
+          .send({ username, password });
+        const createdUser = createUserResponse.body;
 
-      await request(app.getHttpServer())
-        .patch(`/users/${createdUser.id}`)
-        .set('Authorization', `Bearer ${adminToken}`)
-        .send({ username: 'a', password: 'b' })
-        .expect(400);
+        await request(app.getHttpServer())
+          .patch(`/users/${createdUser.id}`)
+          .set('Authorization', `Bearer ${adminToken}`)
+          .send({ username: 'a' })
+          .expect(400);
+      });
+
+      it('when password is too short', async () => {
+        const createUserResponse = await request(app.getHttpServer())
+          .post('/users')
+          .set('Authorization', `Bearer ${adminToken}`)
+          .send({ username, password });
+        const createdUser = createUserResponse.body;
+
+        await request(app.getHttpServer())
+          .patch(`/users/${createdUser.id}`)
+          .set('Authorization', `Bearer ${adminToken}`)
+          .send({ password: 'a' })
+          .expect(400);
+      });
     });
   });
 
   describe('deletes a user', () => {
     it('successfully', async () => {
-      const createUserResponse = await request(app.getHttpServer())
-        .post('/users')
-        .set('Authorization', `Bearer ${adminToken}`)
-        .send({ username, password });
-      const createdUser = createUserResponse.body;
+      const user = await usersService.createUser(username, password);
 
       await request(app.getHttpServer())
-        .delete(`/users/${createdUser.id}`)
+        .delete(`/users/${user.id}`)
         .set('Authorization', `Bearer ${adminToken}`)
         .expect(204);
 
-      await request(app.getHttpServer())
-        .get(`/users/${createdUser.id}`)
-        .set('Authorization', `Bearer ${adminToken}`)
-        .expect(404);
+      expect(await usersService.getById(user.id)).toBeNull();
     });
 
-    it('throws an error when deleting a user with an invalid userId', async () => {
-      const invalidUserId = 'someWrongId';
+    it('throws an error when user is not found', async () => {
+      const id = new Types.ObjectId().toString();
       await request(app.getHttpServer())
-        .delete(`/users/${invalidUserId}`)
+        .delete(`/users/${id}`)
         .set('Authorization', `Bearer ${adminToken}`)
-        .expect(400);
+        .expect(404);
     });
   });
 });
