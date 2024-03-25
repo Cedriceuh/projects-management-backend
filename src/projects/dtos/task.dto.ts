@@ -1,15 +1,27 @@
-import { IsNotEmpty, IsString, MinLength } from 'class-validator';
+import {
+  IsEnum,
+  IsMongoId,
+  IsNotEmpty,
+  IsString,
+  MinLength,
+} from 'class-validator';
 import { TaskStatus } from '../enums/task-status.enum';
 
 export class TaskDto {
   @IsNotEmpty()
-  @IsString()
-  @MinLength(2)
-  name: string;
+  @IsMongoId()
+  readonly id: string;
 
   @IsNotEmpty()
   @IsString()
-  description: string;
+  @MinLength(2)
+  readonly name: string;
 
-  status: TaskStatus;
+  @IsNotEmpty()
+  @IsString()
+  readonly description: string;
+
+  @IsNotEmpty()
+  @IsEnum(TaskStatus)
+  readonly status: TaskStatus;
 }

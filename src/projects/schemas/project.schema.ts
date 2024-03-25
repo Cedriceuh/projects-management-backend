@@ -1,11 +1,13 @@
 import { Schema, Prop, SchemaFactory } from '@nestjs/mongoose';
 import mongoose, { HydratedDocument } from 'mongoose';
-import { Task, TaskSchema } from './task.schema';
+import { Task } from './task.schema';
 
 export type ProjectDocument = HydratedDocument<Project>;
 
 @Schema({ timestamps: true })
 export class Project {
+  _id: mongoose.Types.ObjectId;
+
   @Prop({ type: String, required: true })
   name: string;
 
@@ -13,9 +15,12 @@ export class Project {
   description?: string;
 
   @Prop({ type: mongoose.Schema.Types.ObjectId, required: true })
-  creatorId: string;
+  creatorId: mongoose.Types.ObjectId;
 
-  @Prop({ type: [TaskSchema], default: [] })
+  @Prop({
+    type: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Task' }],
+    default: [],
+  })
   tasks?: Task[];
 }
 

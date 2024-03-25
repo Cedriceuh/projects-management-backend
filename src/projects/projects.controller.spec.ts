@@ -7,6 +7,7 @@ import { Types } from 'mongoose';
 import { JwtTokenPayload } from '../auth/types/jwt-token-payload.type';
 import { Role } from '../users/enums/role.enum';
 import { Request } from 'express';
+import { TaskStatus } from './enums/task-status.enum';
 
 const mockService = {
   getAll: jest.fn(),
@@ -14,13 +15,16 @@ const mockService = {
   create: jest.fn(),
   updateById: jest.fn(),
   deleteById: jest.fn(),
+  addTask: jest.fn(),
+  deleteTask: jest.fn(),
+  updateTaskStatus: jest.fn(),
 };
 
 describe('ProjectsController', () => {
   let controller: ProjectsController;
   let projectsService: ProjectsService;
 
-  const name = 'testproject';
+  const name = 'test';
   const description = 'testdescription';
   const projectObjectId = new Types.ObjectId();
 
@@ -96,6 +100,47 @@ describe('ProjectsController', () => {
 
       await expect(
         controller.deleteProject(projectObjectId.toString()),
+      ).rejects.toBeInstanceOf(NotFoundException);
+    });
+  });
+
+  describe('postTask', () => {
+    it('should throw a not found exception when project is not found', async () => {
+      jest.spyOn(projectsService, 'addTask').mockResolvedValue(null);
+
+      await expect(
+        controller.postTask(projectObjectId.toString(), {
+          name,
+          description,
+          status: TaskStatus.TODO,
+        }),
+      ).rejects.toBeInstanceOf(NotFoundException);
+    });
+  });
+
+  describe('updateTaskStatus', () => {
+    it('should throw a not found exception when task is not found', async () => {
+      jest.spyOn(projectsService, 'updateTaskStatus').mockResolvedValue(false);
+
+      await expect(
+        controller.patchTask(
+          projectObjectId.toString(),
+          new Types.ObjectId().toString(),
+          { status: TaskStatus.DONE },
+        ),
+      ).rejects.toBeInstanceOf(NotFoundException);
+    });
+  });
+
+  describe('deleteTask', () => {
+    it('should throw a not found exception when task is not found', async () => {
+      jest.spyOn(projectsService, 'deleteTask').mockResolvedValue(false);
+
+      await expect(
+        controller.deleteTask(
+          projectObjectId.toString(),
+          new Types.ObjectId().toString(),
+        ),
       ).rejects.toBeInstanceOf(NotFoundException);
     });
   });

@@ -10,10 +10,13 @@ import { AuthService } from '../src/auth/auth.service';
 import { UserDto } from '../src/users/dtos/user.dto';
 import { ProjectsModule } from '../src/projects/projects.module';
 import { ProjectsService } from '../src/projects/projects.service';
+import { TaskStatus } from '../src/projects/enums/task-status.enum';
+import { Task } from '../src/projects/schemas/task.schema';
 
 describe('ProjectsController (e2e)', () => {
   let app: INestApplication;
   let projectModel: Model<Project>;
+  let taskModel: Model<Task>;
   let projectsService: ProjectsService;
   let usersService: UsersService;
 
@@ -22,7 +25,7 @@ describe('ProjectsController (e2e)', () => {
 
   const username = 'testuser';
   const password = 'testpassword';
-  const name = 'testproject';
+  const name = 'test';
   const description = 'testdescription';
 
   beforeAll(async () => {
@@ -44,6 +47,7 @@ describe('ProjectsController (e2e)', () => {
     const authService = app.get<AuthService>(AuthService);
     projectsService = app.get<ProjectsService>(ProjectsService);
     projectModel = app.get(getModelToken(Project.name));
+    taskModel = app.get(getModelToken(Task.name));
     usersService = app.get<UsersService>(UsersService);
 
     user = await usersService.createUser(username, password);
@@ -53,6 +57,7 @@ describe('ProjectsController (e2e)', () => {
 
   afterEach(async () => {
     await projectModel.deleteMany({});
+    await taskModel.deleteMany({});
   });
 
   afterAll(async () => {
@@ -64,19 +69,13 @@ describe('ProjectsController (e2e)', () => {
     it('POST /projects', async () => {
       await request(app.getHttpServer())
         .post('/projects')
-        .send({
-          name: 'testproject',
-          description: 'testdescription',
-        })
+        .send({ name, description })
         .expect(401);
 
       await request(app.getHttpServer())
         .post('/projects')
         .set('Authorization', `Bearer ${userToken}`)
-        .send({
-          name: 'testproject',
-          description: 'testdescription',
-        })
+        .send({ name, description })
         .expect(201);
     });
 
@@ -107,19 +106,13 @@ describe('ProjectsController (e2e)', () => {
 
       await request(app.getHttpServer())
         .patch(`/projects/${project.id}`)
-        .send({
-          name: 'updatedproject',
-          description: 'updateddescription',
-        })
+        .send({ name, description })
         .expect(401);
 
       await request(app.getHttpServer())
         .patch(`/projects/${project.id}`)
         .set('Authorization', `Bearer ${userToken}`)
-        .send({
-          name: 'updatedproject',
-          description: 'updateddescription',
-        })
+        .send({ name, description })
         .expect(204);
     });
 
@@ -135,6 +128,61 @@ describe('ProjectsController (e2e)', () => {
         .set('Authorization', `Bearer ${userToken}`)
         .expect(204);
     });
+
+    it('POST /projects/:id/tasks', async () => {
+      const project = await projectsService.create(user.id, name, description);
+
+      await request(app.getHttpServer())
+        .post(`/projects/${project.id}/tasks`)
+        .send({ name, description, status: 'TODO' })
+        .expect(401);
+
+      await request(app.getHttpServer())
+        .post(`/projects/${project.id}/tasks`)
+        .set('Authorization', `Bearer ${userToken}`)
+        .send({ name, description, status: 'TODO' })
+        .expect(201);
+    });
+
+    it('PATCH /projects/:id/tasks/:taskId', async () => {
+      let project = await projectsService.create(user.id, name, description);
+      project = await projectsService.addTask(project.id, {
+        name,
+        description,
+        status: TaskStatus.TODO,
+      });
+      const taskId = project.tasks[0].id;
+
+      await request(app.getHttpServer())
+        .patch(`/projects/${project.id}/tasks/${taskId}`)
+        .send({ status: TaskStatus.DONE })
+        .expect(401);
+
+      await request(app.getHttpServer())
+        .patch(`/projects/${project.id}/tasks/${taskId}`)
+        .set('Authorization', `Bearer ${userToken}`)
+        .send({ status: TaskStatus.DONE })
+        .expect(204);
+    });
+
+    it('DELETE /projects/:id/tasks/:taskId', async () => {
+      let project = await projectsService.create(user.id, name, description);
+      project = await projectsService.addTask(project.id, {
+        name,
+        description,
+        status: TaskStatus.TODO,
+      });
+      const taskId = project.tasks[0].id;
+
+      await request(app.getHttpServer())
+        .delete(`/projects/${project.id}/tasks/${taskId}`)
+        .expect(401);
+
+      await request(app.getHttpServer())
+        .delete(`/projects/${project.id}/tasks/${taskId}`)
+        .set('Authorization', `Bearer ${userToken}`)
+        .expect(204);
+    });
   });
 
   describe('creates a new project', () => {
@@ -142,10 +190,7 @@ describe('ProjectsController (e2e)', () => {
       const response = await request(app.getHttpServer())
         .post('/projects')
         .set('Authorization', `Bearer ${userToken}`)
-        .send({
-          name,
-          description,
-        })
+        .send({ name, description })
         .expect('Content-Type', /json/)
         .expect(201);
 
@@ -324,10 +369,221 @@ describe('ProjectsController (e2e)', () => {
       expect(await projectsService.getById(project.id)).toBeNull();
     });
 
+    it('with all associated tasks', async () => {
+      let project = await projectsService.create(user.id, name, description);
+      project = await projectsService.addTask(project.id, {
+        name,
+        description,
+        status: TaskStatus.TODO,
+      });
+
+      await request(app.getHttpServer())
+        .delete(`/projects/${project.id}`)
+        .set('Authorization', `Bearer ${userToken}`)
+        .expect(204);
+
+      expect(await taskModel.find({})).toHaveLength(0);
+    });
+
     it('throws an error when project is not found', async () => {
       const id = new Types.ObjectId().toString();
       await request(app.getHttpServer())
         .delete(`/projects/${id}`)
+        .set('Authorization', `Bearer ${userToken}`)
+        .expect(404);
+    });
+  });
+
+  describe('adds a task to a project', () => {
+    it('successfully', async () => {
+      const project = await projectsService.create(user.id, name, description);
+
+      const response = await request(app.getHttpServer())
+        .post(`/projects/${project.id}/tasks`)
+        .set('Authorization', `Bearer ${userToken}`)
+        .send({
+          name: 'testtask',
+          description: 'testdescription',
+          status: 'TODO',
+        })
+        .expect('Content-Type', /json/)
+        .expect(201);
+
+      expect(response.body).toEqual(await projectsService.getById(project.id));
+    });
+
+    it('throws an error when project is not found', async () => {
+      const id = new Types.ObjectId().toString();
+      await request(app.getHttpServer())
+        .post(`/projects/${id}/tasks`)
+        .set('Authorization', `Bearer ${userToken}`)
+        .send({
+          name: 'testtask',
+          description: 'testdescription',
+          status: 'TODO',
+        })
+        .expect(404);
+    });
+
+    describe('throws an error when parameters are invalid', () => {
+      it('when name is missing', async () => {
+        const project = await projectsService.create(
+          user.id,
+          name,
+          description,
+        );
+
+        await request(app.getHttpServer())
+          .post(`/projects/${project.id}/tasks`)
+          .set('Authorization', `Bearer ${userToken}`)
+          .send({
+            description: 'testdescription',
+          })
+          .expect(400);
+      });
+
+      it('when description is missing', async () => {
+        const project = await projectsService.create(
+          user.id,
+          name,
+          description,
+        );
+
+        await request(app.getHttpServer())
+          .post(`/projects/${project.id}/tasks`)
+          .set('Authorization', `Bearer ${userToken}`)
+          .send({
+            name: 'testtask',
+          })
+          .expect(400);
+      });
+
+      it('when name is too short', async () => {
+        const project = await projectsService.create(
+          user.id,
+          name,
+          description,
+        );
+
+        await request(app.getHttpServer())
+          .post(`/projects/${project.id}/tasks`)
+          .set('Authorization', `Bearer ${userToken}`)
+          .send({
+            name: 'a',
+            description: 'testdescription',
+          })
+          .expect(400);
+      });
+
+      it('when status is invalid', async () => {
+        const project = await projectsService.create(
+          user.id,
+          name,
+          description,
+        );
+
+        await request(app.getHttpServer())
+          .post(`/projects/${project.id}/tasks`)
+          .set('Authorization', `Bearer ${userToken}`)
+          .send({
+            name: 'testtask',
+            description: 'testdescription',
+            status: 'INVALID',
+          })
+          .expect(400);
+      });
+    });
+  });
+
+  describe('updates a task status', () => {
+    it('successfully', async () => {
+      let project = await projectsService.create(user.id, name, description);
+      project = await projectsService.addTask(project.id, {
+        name: 'testtask',
+        description: 'testdescription',
+        status: TaskStatus.TODO,
+      });
+      const taskId = project.tasks[0].id;
+
+      await request(app.getHttpServer())
+        .patch(`/projects/${project.id}/tasks/${taskId}`)
+        .set('Authorization', `Bearer ${userToken}`)
+        .send({
+          status: TaskStatus.DONE,
+        })
+        .expect(204);
+
+      expect(
+        (await projectsService.getById(project.id)).tasks[0].status,
+      ).toEqual(TaskStatus.DONE);
+    });
+
+    it('throws an error when project is not found', async () => {
+      const id = new Types.ObjectId().toString();
+      const task = new Types.ObjectId().toString();
+      await request(app.getHttpServer())
+        .patch(`/projects/${id}/tasks/${task}`)
+        .set('Authorization', `Bearer ${userToken}`)
+        .send({
+          status: 'DONE',
+        })
+        .expect(404);
+    });
+
+    it('throws an error when task is not found', async () => {
+      const project = await projectsService.create(user.id, name, description);
+      const id = new Types.ObjectId().toString();
+      await request(app.getHttpServer())
+        .patch(`/projects/${project.id}/tasks/${id}`)
+        .set('Authorization', `Bearer ${userToken}`)
+        .send({
+          status: 'DONE',
+        })
+        .expect(404);
+    });
+
+    describe('throws an error when parameters are invalid', () => {
+      it('when status is invalid', async () => {
+        let project = await projectsService.create(user.id, name, description);
+        project = await projectsService.addTask(project.id, {
+          name: 'testtask',
+          description: 'testdescription',
+          status: TaskStatus.TODO,
+        });
+        const taskId = project.tasks[0].id;
+
+        await request(app.getHttpServer())
+          .patch(`/projects/${project.id}/tasks/${taskId}`)
+          .set('Authorization', `Bearer ${userToken}`)
+          .send({
+            status: 'hihujbnh',
+          })
+          .expect(400);
+      });
+    });
+  });
+
+  describe('deletes a task', () => {
+    it('successfully', async () => {
+      let project = await projectsService.create(user.id, name, description);
+      project = await projectsService.addTask(project.id, {
+        name: 'testtask',
+        description: 'testdescription',
+        status: TaskStatus.TODO,
+      });
+      const taskId = project.tasks[0].id;
+
+      await request(app.getHttpServer())
+        .delete(`/projects/${project.id}/tasks/${taskId}`)
+        .set('Authorization', `Bearer ${userToken}`)
+        .expect(204);
+    });
+
+    it('throws an error when task is not found', async () => {
+      const project = await projectsService.create(user.id, name, description);
+      const id = new Types.ObjectId().toString();
+      await request(app.getHttpServer())
+        .delete(`/projects/${project.id}/tasks/${id}`)
         .set('Authorization', `Bearer ${userToken}`)
         .expect(404);
     });

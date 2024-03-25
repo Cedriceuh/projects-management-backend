@@ -25,6 +25,8 @@ import { RoleGuard } from '../auth/guards/roles.guard';
 import { ProjectDto } from './dtos/project.dto';
 import { UpdateProjectDto } from './dtos/update-project.dto';
 import { GetProjectsDto } from './dtos/get-projects.dto';
+import { CreateTaskDto } from './dtos/create-task.dto';
+import { UpdateTaskDto } from './dtos/update-task.dto';
 
 @Controller('projects')
 @Roles(Role.USER)
@@ -99,6 +101,61 @@ export class ProjectsController {
     let isDeleted: boolean;
     try {
       isDeleted = await this.projectsService.deleteById(id);
+    } catch (e) {
+      throw new BadRequestException();
+    }
+
+    if (!isDeleted) {
+      throw new NotFoundException();
+    }
+  }
+
+  @Post(':projectId/tasks')
+  async postTask(
+    @Param('projectId') projectId: string,
+    @Body() createTaskDto: CreateTaskDto,
+  ) {
+    const projectDto = await this.projectsService.addTask(
+      projectId,
+      createTaskDto,
+    );
+
+    if (!projectDto) {
+      throw new NotFoundException();
+    }
+
+    return projectDto;
+  }
+
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @Patch(':projectId/tasks/:taskId')
+  async patchTask(
+    @Param('projectId') projectId: string,
+    @Param('taskId') taskId: string,
+    @Body() updateTaskDto: UpdateTaskDto,
+  ) {
+    const { status } = updateTaskDto;
+    let isUpdated: boolean;
+    try {
+      isUpdated = await this.projectsService.updateTaskStatus(taskId, status);
+    } catch (e) {
+      throw new BadRequestException();
+    }
+
+    if (!isUpdated) {
+      throw new NotFoundException();
+    }
+  }
+
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @Delete(':projectId/tasks/:taskId')
+  async deleteTask(
+    @Param('projectId') projectId: string,
+    @Param('taskId') taskId: string,
+  ) {
+    let isDeleted: boolean;
+    try {
+      isDeleted = await this.projectsService.deleteTask(projectId, taskId);
     } catch (e) {
       throw new BadRequestException();
     }

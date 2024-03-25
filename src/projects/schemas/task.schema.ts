@@ -1,11 +1,13 @@
 import { Schema, Prop, SchemaFactory } from '@nestjs/mongoose';
-import { HydratedDocument } from 'mongoose';
+import mongoose, { HydratedDocument } from 'mongoose';
 import { TaskStatus } from '../enums/task-status.enum';
 
 export type TaskDocument = HydratedDocument<Task>;
 
 @Schema({ timestamps: true })
 export class Task {
+  _id: mongoose.Types.ObjectId;
+
   @Prop({ type: String, required: true })
   name: string;
 
