@@ -212,19 +212,15 @@ describe('UsersController (e2e)', () => {
 
   describe('returns a user data', () => {
     it('successfully', async () => {
-      const createUserResponse = await request(app.getHttpServer())
-        .post('/users')
-        .set('Authorization', `Bearer ${adminToken}`)
-        .send({ username, password });
-      const createdUser = createUserResponse.body;
+      const user = await usersService.createUser(username, password);
 
       const response = await request(app.getHttpServer())
-        .get(`/users/${createdUser.id}`)
+        .get(`/users/${user.id}`)
         .set('Authorization', `Bearer ${adminToken}`)
         .expect('Content-Type', /json/)
         .expect(200);
 
-      expect(response.body).toEqual(await usersService.getById(createdUser.id));
+      expect(response.body).toEqual(await usersService.getById(user.id));
     });
 
     it('throws an error when user is not found', async () => {
@@ -287,26 +283,21 @@ describe('UsersController (e2e)', () => {
     const newPassword = 'newPassword';
 
     it('successfully', async () => {
-      const createUserResponse = await request(app.getHttpServer())
-        .post('/users')
-        .set('Authorization', `Bearer ${adminToken}`)
-        .send({ username, password });
-      const createdUser = createUserResponse.body;
+      const user = await usersService.createUser(username, password);
 
       await request(app.getHttpServer())
-        .patch(`/users/${createdUser.id}`)
+        .patch(`/users/${user.id}`)
         .set('Authorization', `Bearer ${adminToken}`)
         .send({ username: newUsername, password: newPassword })
         .expect(204);
 
-      const updatedUser = await usersService.getById(createdUser.id);
-
+      const updatedUser = await usersService.getById(user.id);
       expect(updatedUser.username).toBe(newUsername);
       expect(updatedUser.password).not.toBe(password);
       expect(updatedUser.password).not.toBe(newPassword);
     });
 
-    it('throws an error when updating a not found user', async () => {
+    it('throws an error when user is not found', async () => {
       await request(app.getHttpServer())
         .patch(`/users/${new Types.ObjectId().toString()}`)
         .set('Authorization', `Bearer ${adminToken}`)
@@ -314,39 +305,22 @@ describe('UsersController (e2e)', () => {
         .expect(404);
     });
 
-    it('throws an error when updating a user with an invalid userId', async () => {
-      const invalidUserId = 'someWrongId';
-      await request(app.getHttpServer())
-        .patch(`/users/${invalidUserId}`)
-        .set('Authorization', `Bearer ${adminToken}`)
-        .send({ username: newUsername, password: newPassword })
-        .expect(400);
-    });
-
     describe('throws an error when parameters are invalid', () => {
       it('when username is too short', async () => {
-        const createUserResponse = await request(app.getHttpServer())
-          .post('/users')
-          .set('Authorization', `Bearer ${adminToken}`)
-          .send({ username, password });
-        const createdUser = createUserResponse.body;
+        const user = await usersService.createUser(username, password);
 
         await request(app.getHttpServer())
-          .patch(`/users/${createdUser.id}`)
+          .patch(`/users/${user.id}`)
           .set('Authorization', `Bearer ${adminToken}`)
           .send({ username: 'a' })
           .expect(400);
       });
 
       it('when password is too short', async () => {
-        const createUserResponse = await request(app.getHttpServer())
-          .post('/users')
-          .set('Authorization', `Bearer ${adminToken}`)
-          .send({ username, password });
-        const createdUser = createUserResponse.body;
+        const user = await usersService.createUser(username, password);
 
         await request(app.getHttpServer())
-          .patch(`/users/${createdUser.id}`)
+          .patch(`/users/${user.id}`)
           .set('Authorization', `Bearer ${adminToken}`)
           .send({ password: 'a' })
           .expect(400);

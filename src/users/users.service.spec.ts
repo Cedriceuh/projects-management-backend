@@ -19,7 +19,7 @@ describe('UsersService', () => {
   let service: UsersService;
   let userModel: Partial<Model<User>>;
 
-  const username = 'testuser';
+  const username = 'test';
   const password = 'testpassword';
   const hashedPassword = bcrypt.hashSync(password);
   const userObjectId = new Types.ObjectId();
@@ -27,12 +27,14 @@ describe('UsersService', () => {
     _id: userObjectId,
     username,
     password: hashedPassword,
+    roles: [],
     save: jest.fn(),
   };
   const userDto: UserDto = {
     id: userObjectId.toString(),
     username,
-    password,
+    password: hashedPassword,
+    roles: [],
   };
 
   beforeEach(async () => {
@@ -64,14 +66,9 @@ describe('UsersService', () => {
         return query;
       });
 
-      const userDtos = await service.getAll(0, 1);
+      const users = await service.getAll(0, 1);
 
-      expect(userDtos).toEqual([
-        {
-          ...userDto,
-          password: hashedPassword,
-        },
-      ]);
+      expect(users).toEqual([userDto]);
     });
 
     it("should return an empty array when there isn't any user", async () => {
@@ -83,9 +80,9 @@ describe('UsersService', () => {
         return query;
       });
 
-      const userDtos = await service.getAll(0, 1);
+      const users = await service.getAll();
 
-      expect(userDtos).toEqual([]);
+      expect(users).toEqual([]);
     });
   });
 
@@ -95,10 +92,7 @@ describe('UsersService', () => {
 
       const result = await service.getByUsername(username);
 
-      expect(result).toEqual({
-        ...userDto,
-        password: hashedPassword,
-      });
+      expect(result).toEqual(userDto);
     });
 
     it('should return null when user is not found', async () => {
@@ -115,11 +109,7 @@ describe('UsersService', () => {
       jest.spyOn(userModel, 'findById').mockResolvedValue(userDocument);
 
       const result = await service.getById(userObjectId.toString());
-
-      expect(result).toEqual({
-        ...userDto,
-        password: hashedPassword,
-      });
+      expect(result).toEqual(userDto);
     });
 
     it('should return null when user is not found', async () => {
@@ -141,12 +131,7 @@ describe('UsersService', () => {
 
       const result = await service.createUser(username, password);
 
-      expect(result).toEqual({
-        id: userObjectId.toString(),
-        username,
-        password: hashedPassword,
-        roles: [Role.USER],
-      });
+      expect(result).toEqual({ ...userDto, roles: [Role.USER] });
     });
 
     it('should throw an error when given username is already used', async () => {
@@ -168,12 +153,7 @@ describe('UsersService', () => {
 
       const result = await service.createAdmin(username, password);
 
-      expect(result).toEqual({
-        id: userObjectId.toString(),
-        username,
-        password: hashedPassword,
-        roles: [Role.ADMIN],
-      });
+      expect(result).toEqual({ ...userDto, roles: [Role.ADMIN] });
     });
   });
 
@@ -198,15 +178,12 @@ describe('UsersService', () => {
   });
 
   describe('updateById', () => {
-    const updatedUsername = 'testuser2';
-    const updatedPassword = 'testpassword2';
-
     it('should return true when user is updated', async () => {
       jest.spyOn(userModel, 'findById').mockResolvedValue(userDocument);
 
       const result = await service.updateById(userObjectId.toString(), {
-        username: updatedUsername,
-        password: updatedPassword,
+        username,
+        password,
       });
 
       expect(result).toBe(true);
